@@ -4,11 +4,8 @@ More documentation about datasource plugins can be found in the [Docs](https://g
 
 ## Installation
 
-To install this plugin using the `grafana-cli` tool:
+To install this plugin download zip and unpack into grafana's /plugins directory
 ```
-sudo grafana-cli plugins install grafana-simple-json-datasource-appiot
 sudo service grafana-server restart
 ```
-See [here](https://grafana.com/plugins/grafana-simple-json-datasource/installation) for more
-information.
 
