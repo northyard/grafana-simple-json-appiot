@@ -10,13 +10,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/grafana/simple-json-datasource.git"
+    "url": "git+https://github.com/northyard/grafana-simple-json-appiot.git"
   },
   "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/grafana/simple-json-datasource/issues"
-  },
+  "license": "ISC",  
   "engines": {
     "node": "6.10.0"
   },
@@ -48,5 +45,5 @@
     "mocha": "^3.2.0",
     "ngeohash": "^0.6.0"
   },
-  "homepage": "https://github.com/grafana/simple-json-datasource#readme"
+  "homepage": "https://github.com/northyard/grafana-simple-json-appiot#readme"
 }
