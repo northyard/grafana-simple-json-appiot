@@ -424,7 +424,7 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                   var time = new Date(event.CreatedDateTime).getTime();
                   var from = new Date(calleroption.range.from).getTime();
                   var to = new Date(calleroption.range.to).getTime();
-                  if (time <= to && time >= from && event.EventCategoryName == calleroption.annotation.query) {
+                  if (time <= to && time >= from && event.EventCategoryName.toUpperCase() == calleroption.annotation.query.toUpperCase()) {
                     var ann = {};
                     ann.name = eventcategoryname;
                     ann.enabled = true;
