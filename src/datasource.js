@@ -380,7 +380,7 @@ export class GenericDatasource {
     const calleroption = options
     const caller = this
     return new Promise(function (resolve, reject) {
-      var eventcategoryname = "BLABHK_IoTServiceApp_Alert" // need to put this to the configuration menu
+      var eventcategoryname = calleroption.annotation.query //"BLABHK_IoTServiceApp_Alert" // need to put this to the configuration menu
       let url = `${caller.appiot.apiURI}/events?filter[0].Key=EventCategoryName&filter[0].Value=${eventcategoryname}`
       axios.get(url, { 'headers':caller.appiot.apiHeaders }) // todo get pagination
         .then((result) => {
@@ -400,7 +400,7 @@ export class GenericDatasource {
               annotation.title = event.RuleName
               annotation.time = time
               annotation.text = 'created:' + event.CreatedDateTime + 'reset:' + event.ResetDateTime
-              annotation.tags = "BLABHK_IoTServiceApp_Alert"
+              annotation.tags = calleroption.annotation.query
               arr.push(annotation)
             }
           })
