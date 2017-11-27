@@ -389,7 +389,7 @@ export class GenericDatasource {
             var time = new Date(event.CreatedDateTime).getTime()
             var from = new Date(calleroption.range.from).getTime()
             var to = new Date(calleroption.range.to).getTime()
-            if (time <= to && time >= from) {
+            if (time <= to && time >= from && eevent.EventCategoryName ==  calleroption.annotation.query) {
               var ann = {}
               ann.name = eventcategoryname
               ann.enabled = true
