@@ -7,7 +7,7 @@ export class GenericDatasource {
 
 
   constructor(instanceSettings, $q, backendSrv, templateSrv) {
-    this.geolocationv = []
+   /* this.geolocationv = []
     for (var i = 0; i < 50; i++) {
       var a = {}
       a.UnixTimestamp = (new Date().getTime()) - Math.random() * 600000;
@@ -18,7 +18,7 @@ export class GenericDatasource {
       bp[2] = Math.floor(Number(bp[2]) + Math.random() * 20)
       a.sv = bp[0] + ',' + bp[1] + ',' + bp[2]
       this.geolocationv.push(a)
-    }
+    }*/
     this.type = instanceSettings.type;
     this.url = instanceSettings.url;
     this.name = instanceSettings.name;
@@ -281,8 +281,8 @@ export class GenericDatasource {
                     row.push(value.UnixTimestamp)
                     row.push(value.sv)                  
                     row.push(part[2])
-                    var lat = Number(part[0]) - Math.random() * 0.002
-                    var lon = Number(part[1]) - Math.random() * 0.003
+                    var lat = Number(part[0]);// - Math.random() * 0.002
+                    var lon = Number(part[1]);// - Math.random() * 0.003
                     var geoh = caller.GeohashEncode(lat,lon,9)
                     row.push(geoh)
                     row.push(new Date(value.UnixTimestamp).toISOString())
