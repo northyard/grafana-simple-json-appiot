@@ -222,12 +222,30 @@ export class GenericDatasource {
 
       let promiseArray = [];
       req.targets.forEach((target) => {
-        var resource = caller.resourceList.find(resource => {
-          return resource.Name == target.target
-        })
+        var resource = null;
+        if(target.target.indexOf('TimeWeightedAverage')>=0 || target.target.indexOf('Variance')>=0) {          
+          var targetresource = target.target.split(',')[0]
+          resource = caller.resourceList.find(resource => {
+            return resource.Name == targetresource
+          })
+        }
+        else {
+          resource = caller.resourceList.find(resource => {
+            return resource.Name == target.target
+          })
+        }
         var from = new Date(req.range.from).getTime();
         var to = new Date(req.range.to).getTime();
-        var url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+        var url = null;
+        if(target.target.indexOf('TimeWeightedAverage')>=0) {          
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;                      
+        }
+        else if(target.target.indexOf('Variance')>=0) {          
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;                      
+        }
+        else {
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+        }        
         let promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': target.target, 'targettype': target.type }).catch((err) => { console.log(err) })
         promiseArray.push(promise)
       })
@@ -291,51 +309,85 @@ export class GenericDatasource {
                 })
               }
               else {
-                tsResult.columns = []
-                var col1 = {}
-                col1.text = 'Time'
-                col1.type = 'time'
-                col1.sort = true,
+                if(args[i].data.AggregationType !=null){
+                  tsResult.columns = []
+                  var col1 = {}
+                  col1.text = 'Time'
+                  col1.type = 'time'
+                  col1.sort = true,
                   col1.desc = true,
-                  tsResult.columns.push(col1)
-                var col = {}
-                col.text = 'v'
-                col.type = 'number'
-                tsResult.columns.push(col)
-                col.text = 'sv'
-                col.type = 'string'
-                tsResult.columns.push(col)
-                col.text = 'bv'
-                col.type = 'boolean'
-                tsResult.columns.push(col)
-                tsResult.rows = []
-                tsResult.type = 'table'
-                args[i].data.v.forEach((value) => { // resource obj
-                  var row = []
-                  row.push(value.UnixTimestamp)
-                  row.push(value.v)
-                  row.push(value.sv)
-                  row.push(value.bv)
-                  tsResult.rows.push(row)
-                })
+                   tsResult.columns.push(col1)
+                  var col = {}
+                  col.text = 'm'
+                  col.type = 'number'
+                  tsResult.columns.push(col)
+                  tsResult.rows = []
+                  tsResult.type = 'table'
+                  args[i].data.v.forEach((value) => { // resource obj
+                    var row = []
+                    row.push(value.t)
+                    row.push(value.m)                    
+                    tsResult.rows.push(row)
+                  })
+                }
+                else {
+                  tsResult.columns = []
+                  var col1 = {}
+                  col1.text = 'Time'
+                  col1.type = 'time'
+                  col1.sort = true,
+                    col1.desc = true,
+                    tsResult.columns.push(col1)
+                  var col = {}
+                  col.text = 'v'
+                  col.type = 'number'
+                  tsResult.columns.push(col)
+                  col.text = 'sv'
+                  col.type = 'string'
+                  tsResult.columns.push(col)
+                  col.text = 'bv'
+                  col.type = 'boolean'
+                  tsResult.columns.push(col)
+                  tsResult.rows = []
+                  tsResult.type = 'table'
+                  args[i].data.v.forEach((value) => { // resource obj
+                    var row = []
+                    row.push(value.UnixTimestamp)
+                    row.push(value.v)
+                    row.push(value.sv)
+                    row.push(value.bv)
+                    tsResult.rows.push(row)
+                  })
+                }
               }
             }
             else {
               tsResult.target = args[i].config.target
               tsResult.datapoints = []
-              args[i].data.v.forEach((value) => { // resource obj
-                var arr = []
-                var val = 0
-                if (value.v != null) {
-                  val = value.v
-                }
-                else if (value.sv != null) {
-                  val = value.sv
-                }
-                arr.push(val)
-                arr.push(value.UnixTimestamp)
-                tsResult.datapoints.push(arr)
-              })
+              if(args[i].data.AggregationType !=null){
+                //this is aggregation
+                args[i].data.v.forEach((value) => { // resource obj
+                  var arr = []                                    
+                  arr.push(value.m)
+                  arr.push(value.t)
+                  tsResult.datapoints.push(arr)
+                })
+              }
+              else {
+                args[i].data.v.forEach((value) => { // resource obj
+                  var arr = []
+                  var val = 0
+                  if (value.v != null) {
+                    val = value.v
+                  }
+                  else if (value.sv != null) {
+                    val = value.sv
+                  }
+                  arr.push(val)
+                  arr.push(value.UnixTimestamp)
+                  tsResult.datapoints.push(arr)
+                })
+              }
             }
             tsResultArray.push(tsResult)
           }
@@ -458,6 +510,10 @@ export class GenericDatasource {
           var list = []
           caller.resourceList.forEach((resource) => {
             list.push(resource.Name)
+            if(resource.Name == 'BleSensor'){
+              list.push(resource.Name + ", 5min TimeWeightedAverage")
+              list.push(resource.Name + ", 5min Variance")
+            }            
           })
           var result = {}
           result.data = list
