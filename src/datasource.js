@@ -241,7 +241,7 @@ export class GenericDatasource {
           url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;                      
         }
         else if(target.target.indexOf('Variance')>=0) {          
-          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;                      
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=Variance`;                      
         }
         else {
           url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
