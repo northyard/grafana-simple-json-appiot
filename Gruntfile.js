@@ -27,6 +27,12 @@ module.exports = function(grunt) {
         src: ['**/axios/dist/*'],
         dest: 'dist/node_modules'
       },
+      node_modules2: {
+        cwd: 'node_modules',
+        expand: true,
+        src: ['**/pako/dist/*'],
+        dest: 'dist/node_modules'
+      },
     
     },
 
@@ -60,5 +66,5 @@ module.exports = function(grunt) {
    
   });
 
-  grunt.registerTask('default', ['clean', 'copy:src_to_dist', 'copy:pluginDef', 'copy:node_modules','babel']);
+  grunt.registerTask('default', ['clean', 'copy:src_to_dist', 'copy:pluginDef', 'copy:node_modules','copy:node_modules2','babel']);
 };

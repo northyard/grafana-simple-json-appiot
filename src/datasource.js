@@ -1,5 +1,8 @@
 import _ from "lodash";
 import * as axios from "./node_modules/axios/dist/axios";
+import * as pako from "./node_modules/pako/dist/pako";
+
+
 
 
 export class GenericDatasource {
@@ -204,26 +207,145 @@ export class GenericDatasource {
   };
 
   query(options) {
+    //var gzip = require('gzip-js')
+    //var zlib = require('zlib');
+    var Base64 = {
+      characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+      _keyStr : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+      encode: function (string) {
+        var characters = Base64.characters;
+        var result = '';
+
+        var i = 0;
+        do {
+          var a = string.charCodeAt(i++);
+          var b = string.charCodeAt(i++);
+          var c = string.charCodeAt(i++);
+
+          a = a ? a : 0;
+          b = b ? b : 0;
+          c = c ? c : 0;
+
+          var b1 = (a >> 2) & 0x3F;
+          var b2 = ((a & 0x3) << 4) | ((b >> 4) & 0xF);
+          var b3 = ((b & 0xF) << 2) | ((c >> 6) & 0x3);
+          var b4 = c & 0x3F;
+
+          if (!b) {
+            b3 = b4 = 64;
+          } else if (!c) {
+            b4 = 64;
+          }
+
+          result += Base64.characters.charAt(b1) + Base64.characters.charAt(b2) + Base64.characters.charAt(b3) + Base64.characters.charAt(b4);
+
+        } while (i < string.length);
+
+        return result;
+      },
+
+      decode: function (string) {
+        var characters = Base64.characters;
+        var result = '';
+
+        var i = 0;
+        do {
+          var b1 = Base64.characters.indexOf(string.charAt(i++));
+          var b2 = Base64.characters.indexOf(string.charAt(i++));
+          var b3 = Base64.characters.indexOf(string.charAt(i++));
+          var b4 = Base64.characters.indexOf(string.charAt(i++));
+
+          var a = ((b1 & 0x3F) << 2) | ((b2 >> 4) & 0x3);
+          var b = ((b2 & 0xF) << 4) | ((b3 >> 2) & 0xF);
+          var c = ((b3 & 0x3) << 6) | (b4 & 0x3F);
+
+          result += String.fromCharCode(a) + (b ? String.fromCharCode(b) : '') + (c ? String.fromCharCode(c) : '');
+
+        } while (i < string.length);
+
+        return result;
+      },
+
+      decodeBase64: function(s) {
+        var e={},i,b=0,c,x,l=0,a,r='',w=String.fromCharCode,L=s.length;
+        var A="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        for(i=0;i<64;i++){e[A.charAt(i)]=i;}
+        for(x=0;x<L;x++){
+            c=e[s.charAt(x)];b=(b<<6)+c;l+=6;
+            while(l>=8){((a=(b>>>(l-=8))&0xff)||(x<(L-2)))&&(r+=w(a));}
+        }
+        return r;
+      },
+      /* will return a  Uint8Array type */
+      decodeArrayBuffer: function (input) {
+        var bytes = (input.length / 4) * 3;
+        var ab = new ArrayBuffer(bytes);
+        this.decode(input, ab);
+
+        return ab;
+      },
+
+      removePaddingChars: function (input) {
+        var lkey = this._keyStr.indexOf(input.charAt(input.length - 1));
+        if (lkey == 64) {
+          return input.substring(0, input.length - 1);
+        }
+        return input;
+      },
+
+      decode2: function (input, arrayBuffer) {
+        //get last chars to see if are valid
+        input = this.removePaddingChars(input);
+        input = this.removePaddingChars(input);
+
+        var bytes = parseInt((input.length / 4) * 3, 10);
+
+        var uarray;
+        var chr1, chr2, chr3;
+        var enc1, enc2, enc3, enc4;
+        var i = 0;
+        var j = 0;
+
+        if (arrayBuffer)
+          uarray = new Uint8Array(arrayBuffer);
+        else
+          uarray = new Uint8Array(bytes);
+
+        input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
+
+        for (i = 0; i < bytes; i += 3) {
+          //get the 3 octects in 4 ascii chars
+          enc1 = this._keyStr.indexOf(input.charAt(j++));
+          enc2 = this._keyStr.indexOf(input.charAt(j++));
+          enc3 = this._keyStr.indexOf(input.charAt(j++));
+          enc4 = this._keyStr.indexOf(input.charAt(j++));
+
+          chr1 = (enc1 << 2) | (enc2 >> 4);
+          chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+          chr3 = ((enc3 & 3) << 6) | enc4;
+
+          uarray[i] = chr1;
+          if (enc3 != 64) uarray[i + 1] = chr2;
+          if (enc4 != 64) uarray[i + 2] = chr3;
+        }
+
+        return uarray;
+      }
+    };
+
     var query = this.buildQueryParameters(options);
     query.targets = query.targets.filter(t => !t.hide);
+    const caller = this
+    const req = query
 
     if (query.targets.length <= 0) {
       return this.q.when({ data: [] });
     }
-
-    /*return this.doRequest({
-      url: this.url + '/query',
-      data: query,
-      method: 'POST'
-    });*/
-    const caller = this
-    const req = query
-    return new Promise(function (resolve, reject) {
-
+    var getQueryForAppIoT = function(resolve, reject) { 
       let promiseArray = [];
       req.targets.forEach((target) => {
         var resource = null;
-        if(target.target.indexOf('TimeWeightedAverage')>=0 || target.target.indexOf('Variance')>=0) {          
+        if (target.target.indexOf('TimeWeightedAverage') >= 0 || target.target.indexOf('Variance') >= 0) {
           var targetresource = target.target.split(',')[0]
           resource = caller.resourceList.find(resource => {
             return resource.Name == targetresource
@@ -237,20 +359,37 @@ export class GenericDatasource {
         var from = new Date(req.range.from).getTime();
         var to = new Date(req.range.to).getTime();
         var url = null;
-        if(target.target.indexOf('TimeWeightedAverage')>=0) {          
-          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;                      
+        if (target.target.indexOf('TimeWeightedAverage') >= 0) {
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=TimeWeightedAverage`;
         }
-        else if(target.target.indexOf('Variance')>=0) {          
-          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=Variance`;                      
+        else if (target.target.indexOf('Variance') >= 0) {
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=${from}&measurementQuery.timespanEnd=${to}&measurementQuery.aggregationType=Variance`;
+        }
+        else if (target.target.indexOf('HealthSensor Accuracy') >= 0) {
+          resource = caller.resourceList.find(resource => {
+            return resource.Name == "acHealthSensor"
+          })
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+          let promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorAcc', 'targettype': target.type }).catch((err) => { console.log(err) })
+          promiseArray.push(promise)  
+          resource = caller.resourceList.find(resource => {
+            return resource.Name == "HealthSensor"
+          })
+          url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+          promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorPre', 'targettype': target.type }).catch((err) => { console.log(err) })
+          promiseArray.push(promise) 
+          return //continue 
         }
         else {
           url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
-        }        
+        }
         let promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': target.target, 'targettype': target.type }).catch((err) => { console.log(err) })
         promiseArray.push(promise)
       })
       var tsResultArray = [];
       // perform concurrent get calls for all smart objects                       
+      var healthSensorAcc = [];
+      var healthSensorPre = [];
       axios.all(promiseArray)
         .then(axios.spread((...args) => {
           for (let i = 0; i < args.length; i++) {
@@ -258,7 +397,7 @@ export class GenericDatasource {
             if (args[i] == null) {
               continue;
             }
-
+  
             if (args[i].config.targettype == 'table') {
               if (args[i].config.target == 'GeoLocation') {
                 tsResult.columns = []
@@ -286,22 +425,22 @@ export class GenericDatasource {
                 tsResult.columns.push(col5)
                 tsResult.rows = []
                 tsResult.type = 'table'
-              
+  
                 args[i].data.v.forEach((value) => { // resource obj
-
-                //caller.geolocationv.forEach((value) => { // resource obj
+  
+                  //caller.geolocationv.forEach((value) => { // resource obj
                   var part = value.sv.split(",")
-                  if (part.length <3) {
-                    
+                  if (part.length < 3) {
+  
                   }
                   else {
                     var row = []
                     row.push(value.UnixTimestamp)
-                    row.push(value.sv)                  
+                    row.push(value.sv)
                     row.push(part[2])
                     var lat = Number(part[0]);// - Math.random() * 0.002
                     var lon = Number(part[1]);// - Math.random() * 0.003
-                    var geoh = caller.GeohashEncode(lat,lon,9)
+                    var geoh = caller.GeohashEncode(lat, lon, 9)
                     row.push(geoh)
                     row.push(new Date(value.UnixTimestamp).toISOString())
                     tsResult.rows.push(row)
@@ -309,14 +448,14 @@ export class GenericDatasource {
                 })
               }
               else {
-                if(args[i].data.AggregationType !=null){
+                if (args[i].data.AggregationType != null) {
                   tsResult.columns = []
                   var col1 = {}
                   col1.text = 'Time'
                   col1.type = 'time'
                   col1.sort = true,
-                  col1.desc = true,
-                   tsResult.columns.push(col1)
+                    col1.desc = true,
+                    tsResult.columns.push(col1)
                   var col = {}
                   col.text = 'm'
                   col.type = 'number'
@@ -326,7 +465,7 @@ export class GenericDatasource {
                   args[i].data.v.forEach((value) => { // resource obj
                     var row = []
                     row.push(value.t)
-                    row.push(value.m)                    
+                    row.push(value.m)
                     tsResult.rows.push(row)
                   })
                 }
@@ -361,47 +500,187 @@ export class GenericDatasource {
                 }
               }
             }
-            else {
+            else { // non table
               tsResult.target = args[i].config.target
               tsResult.datapoints = []
-              if(args[i].data.AggregationType !=null){
+  
+              if (args[i].data.AggregationType != null) {
                 //this is aggregation
                 args[i].data.v.forEach((value) => { // resource obj
-                  var arr = []                                    
+                  var arr = []
                   arr.push(value.m)
                   arr.push(value.t)
                   tsResult.datapoints.push(arr)
                 })
               }
               else {
-                args[i].data.v.forEach((value) => { // resource obj
-                  var arr = []
-                  var val = 0
-                  if (value.v != null) {
-                    val = value.v
+                if(tsResult.target == 'HealthSensorAcc'){
+                  healthSensorAcc = args[i].data.v.slice()                
+                  if(healthSensorAcc.length>0 &&  healthSensorPre.length>0){
+                    var idx =0
+                    healthSensorPre.forEach((value)=>{
+                      if(value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp){
+                        idx++
+                      }
+                      else if(value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp){
+                        var v =0
+                        if(value.v == healthSensorAcc[idx].v){
+                          v=1
+                        }
+                          var arr = []
+                          arr.push(v)                        
+                          arr.push(value.UnixTimestamp)
+                          tsResult.datapoints.push(arr)
+                          idx++                      
+                      }
+                    })
                   }
-                  else if (value.sv != null) {
-                    val = value.sv
+                }
+                else if(tsResult.target == 'HealthSensorPre'){
+                  healthSensorPre = args[i].data.v.slice()                  
+                  if(healthSensorAcc.length>0 &&  healthSensorPre.length>0){
+                    var idx =0
+                    healthSensorPre.forEach((value)=>{
+                      if(value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp){
+                        idx++
+                      }
+                      else if(value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp){
+                        var v =0
+                        if(value.v == healthSensorAcc[idx].v){
+                          v=1
+                        }
+                          var arr = []
+                          arr.push(v)                        
+                          arr.push(value.UnixTimestamp)
+                          tsResult.datapoints.push(arr)
+                          idx++
+                        
+                      }
+                    })
                   }
-                  arr.push(val)
-                  arr.push(value.UnixTimestamp)
-                  tsResult.datapoints.push(arr)
-                })
+                }                
+                else if (tsResult.target == 'blobData') {                      
+                  args[i].data.v.forEach((value) => { // resource obj
+                    var arr = []
+                    var val = 0
+                    if (value.sv != null) {
+                      val = value.sv
+                      var blobresult = val.substring(0, 5)
+                      var check = blobresult.substring(0, 1)
+                      if (check == 'N' || check == 'O' || check == '~' || check == 'A') {
+                        var data = val.substring(5)
+                        //const buffer = Buffer.from(data, 'base64');
+                        const timestamp = value.UnixTimestamp
+                        var unzipdata =''
+                        try{
+                          console.log(blobresult)
+                          // Create Base64 Object
+                          //var Base64={_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(e){var t="";var n,r,i,s,o,u,a;var f=0;e=Base64._utf8_encode(e);while(f<e.length){n=e.charCodeAt(f++);r=e.charCodeAt(f++);i=e.charCodeAt(f++);s=n>>2;o=(n&3)<<4|r>>4;u=(r&15)<<2|i>>6;a=i&63;if(isNaN(r)){u=a=64}else if(isNaN(i)){a=64}t=t+this._keyStr.charAt(s)+this._keyStr.charAt(o)+this._keyStr.charAt(u)+this._keyStr.charAt(a)}return t},decode:function(e){var t="";var n,r,i;var s,o,u,a;var f=0;e=e.replace(/[^A-Za-z0-9+/=]/g,"");while(f<e.length){s=this._keyStr.indexOf(e.charAt(f++));o=this._keyStr.indexOf(e.charAt(f++));u=this._keyStr.indexOf(e.charAt(f++));a=this._keyStr.indexOf(e.charAt(f++));n=s<<2|o>>4;r=(o&15)<<4|u>>2;i=(u&3)<<6|a;t=t+String.fromCharCode(n);if(u!=64){t=t+String.fromCharCode(r)}if(a!=64){t=t+String.fromCharCode(i)}}t=Base64._utf8_decode(t);return t},_utf8_encode:function(e){e=e.replace(/rn/g,"n");var t="";for(var n=0;n<e.length;n++){var r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r)}else if(r>127&&r<2048){t+=String.fromCharCode(r>>6|192);t+=String.fromCharCode(r&63|128)}else{t+=String.fromCharCode(r>>12|224);t+=String.fromCharCode(r>>6&63|128);t+=String.fromCharCode(r&63|128)}}return t},_utf8_decode:function(e){var t="";var n=0;var r=c1=c2=0;while(n<e.length){r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r);n++}else if(r>191&&r<224){c2=e.charCodeAt(n+1);t+=String.fromCharCode((r&31)<<6|c2&63);n+=2}else{c2=e.charCodeAt(n+1);c3=e.charCodeAt(n+2);t+=String.fromCharCode((r&15)<<12|(c2&63)<<6|c3&63);n+=3}}return t}}
+                          var decodeddata = Base64.decode2(data)
+                          unzipdata = pako.inflate(decodeddata,{ to: 'string' })
+                          var varr = unzipdata.split(',')
+                          var firstts = timestamp - varr.length * 10 / 3 // fs = 300                            
+                          for (var i = 0; i < varr.length; i += 150) {
+                            var arr = []
+                            arr.push(varr[i]/1000)
+                            var ts = firstts + i * 10 / 3
+                            arr.push(ts)
+                            tsResult.datapoints.push(arr)
+                          }
+                          //console.log(unzipdata.toString());
+                        } catch (err){
+                          console.log(err);  
+                        }
+                        
+                        /*zlib.unzip(buffer, (err, buffer) => {
+                          if (!err) {
+                            console.log(buffer.toString());
+                            var varr = buffer.toString().split(',')
+                            var firstts = timestamp - varr.length * 10 / 3 // fs = 300                            
+                            for (var i = 0; i < varr.length; i += 3) {
+                              arr.push(varr[i])
+                              var ts = firstts + i * 10 / 3
+                              arr.push(ts)
+                              tsResult.datapoints.push(arr)
+                            }
+                          } else {
+                            // handle error
+                          }
+                        });*/
+  
+                      }
+                    }
+                  })
+                  tsResult.datapoints = tsResult.datapoints.sort(function(a,b) { // sort according to ts
+                    return a[1] - b[1];
+                    });
+                }
+                else {
+                  args[i].data.v.forEach((value) => { // resource obj
+                    var arr = []
+                    var val = 0
+                    if (value.v != null) {
+                      val = value.v
+                    }
+                    else if (value.sv != null) {
+                      val = value.sv
+                    }
+                    arr.push(val)
+                    arr.push(value.UnixTimestamp)
+                    tsResult.datapoints.push(arr)
+                  })
+                }
+              }
+            }            
+            if(tsResult.type == 'table'){
+              tsResultArray.push(tsResult)
+            }
+            else {
+              if(tsResult.datapoints.length>0){
+                tsResultArray.push(tsResult)
               }
             }
-            tsResultArray.push(tsResult)
           }
           var result = {}
           result.data = tsResultArray
           resolve(result);
-
+  
         }))
         .catch((error) => {
           console.log(error);
           reject(error)
         })
-    })
+      };
+    
+
+    /*return this.doRequest({
+      url: this.url + '/query',
+      data: query,
+      method: 'POST'
+    });*/
+    if (this.resourceList == null) {
+      return new Promise(function (resolve, reject) {
+        caller.getAllResourceUrlFromDevice(1)
+        .then((result) => {
+          caller.resourceList = result;        
+          console.log(caller.resourceList.length)
+          return getQueryForAppIoT(resolve, reject)        
+        })
+        .catch((err) => {
+          console.log(err)
+          reject(err)
+        })
+      })
+    }
+    else {
+      return new Promise(function (resolve, reject) {
+        getQueryForAppIoT(resolve, reject)
+            });
+    }
+    
   }
+
+ 
 
   testDatasource() {
     const caller = this
@@ -514,6 +793,9 @@ export class GenericDatasource {
               list.push(resource.Name + ", 5min TimeWeightedAverage")
               list.push(resource.Name + ", 5min Variance")
             }            
+            if(resource.Name == 'HealthSensor'){
+              list.push(resource.Name + " Accuracy")
+            }
           })
           var result = {}
           result.data = list
@@ -566,3 +848,4 @@ export class GenericDatasource {
     return options;
   }
 }
+

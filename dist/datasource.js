@@ -1,9 +1,9 @@
 "use strict";
 
-System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export, _context) {
+System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pako/dist/pako"], function (_export, _context) {
   "use strict";
 
-  var _, axios, _createClass, GenericDatasource;
+  var _, axios, pako, _createClass, GenericDatasource;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -16,6 +16,8 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
       _ = _lodash.default;
     }, function (_node_modulesAxiosDistAxios) {
       axios = _node_modulesAxiosDistAxios;
+    }, function (_node_modulesPakoDistPako) {
+      pako = _node_modulesPakoDistPako;
     }],
     execute: function () {
       _createClass = function () {
@@ -242,24 +244,151 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
         }, {
           key: "query",
           value: function query(options) {
+            //var gzip = require('gzip-js')
+            //var zlib = require('zlib');
+            var Base64 = {
+              characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+              _keyStr: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+              encode: function encode(string) {
+                var characters = Base64.characters;
+                var result = '';
+
+                var i = 0;
+                do {
+                  var a = string.charCodeAt(i++);
+                  var b = string.charCodeAt(i++);
+                  var c = string.charCodeAt(i++);
+
+                  a = a ? a : 0;
+                  b = b ? b : 0;
+                  c = c ? c : 0;
+
+                  var b1 = a >> 2 & 0x3F;
+                  var b2 = (a & 0x3) << 4 | b >> 4 & 0xF;
+                  var b3 = (b & 0xF) << 2 | c >> 6 & 0x3;
+                  var b4 = c & 0x3F;
+
+                  if (!b) {
+                    b3 = b4 = 64;
+                  } else if (!c) {
+                    b4 = 64;
+                  }
+
+                  result += Base64.characters.charAt(b1) + Base64.characters.charAt(b2) + Base64.characters.charAt(b3) + Base64.characters.charAt(b4);
+                } while (i < string.length);
+
+                return result;
+              },
+
+              decode: function decode(string) {
+                var characters = Base64.characters;
+                var result = '';
+
+                var i = 0;
+                do {
+                  var b1 = Base64.characters.indexOf(string.charAt(i++));
+                  var b2 = Base64.characters.indexOf(string.charAt(i++));
+                  var b3 = Base64.characters.indexOf(string.charAt(i++));
+                  var b4 = Base64.characters.indexOf(string.charAt(i++));
+
+                  var a = (b1 & 0x3F) << 2 | b2 >> 4 & 0x3;
+                  var b = (b2 & 0xF) << 4 | b3 >> 2 & 0xF;
+                  var c = (b3 & 0x3) << 6 | b4 & 0x3F;
+
+                  result += String.fromCharCode(a) + (b ? String.fromCharCode(b) : '') + (c ? String.fromCharCode(c) : '');
+                } while (i < string.length);
+
+                return result;
+              },
+
+              decodeBase64: function decodeBase64(s) {
+                var e = {},
+                    i,
+                    b = 0,
+                    c,
+                    x,
+                    l = 0,
+                    a,
+                    r = '',
+                    w = String.fromCharCode,
+                    L = s.length;
+                var A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                for (i = 0; i < 64; i++) {
+                  e[A.charAt(i)] = i;
+                }
+                for (x = 0; x < L; x++) {
+                  c = e[s.charAt(x)];b = (b << 6) + c;l += 6;
+                  while (l >= 8) {
+                    ((a = b >>> (l -= 8) & 0xff) || x < L - 2) && (r += w(a));
+                  }
+                }
+                return r;
+              },
+              /* will return a  Uint8Array type */
+              decodeArrayBuffer: function decodeArrayBuffer(input) {
+                var bytes = input.length / 4 * 3;
+                var ab = new ArrayBuffer(bytes);
+                this.decode(input, ab);
+
+                return ab;
+              },
+
+              removePaddingChars: function removePaddingChars(input) {
+                var lkey = this._keyStr.indexOf(input.charAt(input.length - 1));
+                if (lkey == 64) {
+                  return input.substring(0, input.length - 1);
+                }
+                return input;
+              },
+
+              decode2: function decode2(input, arrayBuffer) {
+                //get last chars to see if are valid
+                input = this.removePaddingChars(input);
+                input = this.removePaddingChars(input);
+
+                var bytes = parseInt(input.length / 4 * 3, 10);
+
+                var uarray;
+                var chr1, chr2, chr3;
+                var enc1, enc2, enc3, enc4;
+                var i = 0;
+                var j = 0;
+
+                if (arrayBuffer) uarray = new Uint8Array(arrayBuffer);else uarray = new Uint8Array(bytes);
+
+                input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
+
+                for (i = 0; i < bytes; i += 3) {
+                  //get the 3 octects in 4 ascii chars
+                  enc1 = this._keyStr.indexOf(input.charAt(j++));
+                  enc2 = this._keyStr.indexOf(input.charAt(j++));
+                  enc3 = this._keyStr.indexOf(input.charAt(j++));
+                  enc4 = this._keyStr.indexOf(input.charAt(j++));
+
+                  chr1 = enc1 << 2 | enc2 >> 4;
+                  chr2 = (enc2 & 15) << 4 | enc3 >> 2;
+                  chr3 = (enc3 & 3) << 6 | enc4;
+
+                  uarray[i] = chr1;
+                  if (enc3 != 64) uarray[i + 1] = chr2;
+                  if (enc4 != 64) uarray[i + 2] = chr3;
+                }
+
+                return uarray;
+              }
+            };
+
             var query = this.buildQueryParameters(options);
             query.targets = query.targets.filter(function (t) {
               return !t.hide;
             });
+            var caller = this;
+            var req = query;
 
             if (query.targets.length <= 0) {
               return this.q.when({ data: [] });
             }
-
-            /*return this.doRequest({
-              url: this.url + '/query',
-              data: query,
-              method: 'POST'
-            });*/
-            var caller = this;
-            var req = query;
-            return new Promise(function (resolve, reject) {
-
+            var getQueryForAppIoT = function getQueryForAppIoT(resolve, reject) {
               var promiseArray = [];
               req.targets.forEach(function (target) {
                 var resource = null;
@@ -280,6 +409,24 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                   url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=" + from + "&measurementQuery.timespanEnd=" + to + "&measurementQuery.aggregationType=TimeWeightedAverage";
                 } else if (target.target.indexOf('Variance') >= 0) {
                   url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=" + from + "&measurementQuery.timespanEnd=" + to + "&measurementQuery.aggregationType=Variance";
+                } else if (target.target.indexOf('HealthSensor Accuracy') >= 0) {
+                  resource = caller.resourceList.find(function (resource) {
+                    return resource.Name == "acHealthSensor";
+                  });
+                  url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
+                  var _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorAcc', 'targettype': target.type }).catch(function (err) {
+                    console.log(err);
+                  });
+                  promiseArray.push(_promise);
+                  resource = caller.resourceList.find(function (resource) {
+                    return resource.Name == "HealthSensor";
+                  });
+                  url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
+                  _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorPre', 'targettype': target.type }).catch(function (err) {
+                    console.log(err);
+                  });
+                  promiseArray.push(_promise);
+                  return; //continue 
                 } else {
                   url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
                 }
@@ -290,6 +437,8 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
               });
               var tsResultArray = [];
               // perform concurrent get calls for all smart objects                       
+              var healthSensorAcc = [];
+              var healthSensorPre = [];
               axios.all(promiseArray).then(axios.spread(function () {
                 for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
                   args[_key2] = arguments[_key2];
@@ -395,8 +544,10 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                       }
                     }
                   } else {
+                    // non table
                     tsResult.target = args[i].config.target;
                     tsResult.datapoints = [];
+
                     if (args[i].data.AggregationType != null) {
                       //this is aggregation
                       args[i].data.v.forEach(function (value) {
@@ -407,22 +558,126 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                         tsResult.datapoints.push(arr);
                       });
                     } else {
-                      args[i].data.v.forEach(function (value) {
-                        // resource obj
-                        var arr = [];
-                        var val = 0;
-                        if (value.v != null) {
-                          val = value.v;
-                        } else if (value.sv != null) {
-                          val = value.sv;
+                      if (tsResult.target == 'HealthSensorAcc') {
+                        healthSensorAcc = args[i].data.v.slice();
+                        if (healthSensorAcc.length > 0 && healthSensorPre.length > 0) {
+                          var idx = 0;
+                          healthSensorPre.forEach(function (value) {
+                            if (value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp) {
+                              idx++;
+                            } else if (value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp) {
+                              var v = 0;
+                              if (value.v == healthSensorAcc[idx].v) {
+                                v = 1;
+                              }
+                              var arr = [];
+                              arr.push(v);
+                              arr.push(value.UnixTimestamp);
+                              tsResult.datapoints.push(arr);
+                              idx++;
+                            }
+                          });
                         }
-                        arr.push(val);
-                        arr.push(value.UnixTimestamp);
-                        tsResult.datapoints.push(arr);
-                      });
+                      } else if (tsResult.target == 'HealthSensorPre') {
+                        healthSensorPre = args[i].data.v.slice();
+                        if (healthSensorAcc.length > 0 && healthSensorPre.length > 0) {
+                          var idx = 0;
+                          healthSensorPre.forEach(function (value) {
+                            if (value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp) {
+                              idx++;
+                            } else if (value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp) {
+                              var v = 0;
+                              if (value.v == healthSensorAcc[idx].v) {
+                                v = 1;
+                              }
+                              var arr = [];
+                              arr.push(v);
+                              arr.push(value.UnixTimestamp);
+                              tsResult.datapoints.push(arr);
+                              idx++;
+                            }
+                          });
+                        }
+                      } else if (tsResult.target == 'blobData') {
+                        args[i].data.v.forEach(function (value) {
+                          // resource obj
+                          var arr = [];
+                          var val = 0;
+                          if (value.sv != null) {
+                            val = value.sv;
+                            var blobresult = val.substring(0, 5);
+                            var check = blobresult.substring(0, 1);
+                            if (check == 'N' || check == 'O' || check == '~' || check == 'A') {
+                              var data = val.substring(5);
+                              //const buffer = Buffer.from(data, 'base64');
+                              var timestamp = value.UnixTimestamp;
+                              var unzipdata = '';
+                              try {
+                                console.log(blobresult);
+                                // Create Base64 Object
+                                //var Base64={_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(e){var t="";var n,r,i,s,o,u,a;var f=0;e=Base64._utf8_encode(e);while(f<e.length){n=e.charCodeAt(f++);r=e.charCodeAt(f++);i=e.charCodeAt(f++);s=n>>2;o=(n&3)<<4|r>>4;u=(r&15)<<2|i>>6;a=i&63;if(isNaN(r)){u=a=64}else if(isNaN(i)){a=64}t=t+this._keyStr.charAt(s)+this._keyStr.charAt(o)+this._keyStr.charAt(u)+this._keyStr.charAt(a)}return t},decode:function(e){var t="";var n,r,i;var s,o,u,a;var f=0;e=e.replace(/[^A-Za-z0-9+/=]/g,"");while(f<e.length){s=this._keyStr.indexOf(e.charAt(f++));o=this._keyStr.indexOf(e.charAt(f++));u=this._keyStr.indexOf(e.charAt(f++));a=this._keyStr.indexOf(e.charAt(f++));n=s<<2|o>>4;r=(o&15)<<4|u>>2;i=(u&3)<<6|a;t=t+String.fromCharCode(n);if(u!=64){t=t+String.fromCharCode(r)}if(a!=64){t=t+String.fromCharCode(i)}}t=Base64._utf8_decode(t);return t},_utf8_encode:function(e){e=e.replace(/rn/g,"n");var t="";for(var n=0;n<e.length;n++){var r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r)}else if(r>127&&r<2048){t+=String.fromCharCode(r>>6|192);t+=String.fromCharCode(r&63|128)}else{t+=String.fromCharCode(r>>12|224);t+=String.fromCharCode(r>>6&63|128);t+=String.fromCharCode(r&63|128)}}return t},_utf8_decode:function(e){var t="";var n=0;var r=c1=c2=0;while(n<e.length){r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r);n++}else if(r>191&&r<224){c2=e.charCodeAt(n+1);t+=String.fromCharCode((r&31)<<6|c2&63);n+=2}else{c2=e.charCodeAt(n+1);c3=e.charCodeAt(n+2);t+=String.fromCharCode((r&15)<<12|(c2&63)<<6|c3&63);n+=3}}return t}}
+                                var decodeddata = Base64.decode2(data);
+                                unzipdata = pako.inflate(decodeddata, { to: 'string' });
+                                var varr = unzipdata.split(',');
+                                var firstts = timestamp - varr.length * 10 / 3; // fs = 300                            
+                                for (var i = 0; i < varr.length; i += 150) {
+                                  var arr = [];
+                                  arr.push(varr[i] / 1000);
+                                  var ts = firstts + i * 10 / 3;
+                                  arr.push(ts);
+                                  tsResult.datapoints.push(arr);
+                                }
+                                //console.log(unzipdata.toString());
+                              } catch (err) {
+                                console.log(err);
+                              }
+
+                              /*zlib.unzip(buffer, (err, buffer) => {
+                                if (!err) {
+                                  console.log(buffer.toString());
+                                  var varr = buffer.toString().split(',')
+                                  var firstts = timestamp - varr.length * 10 / 3 // fs = 300                            
+                                  for (var i = 0; i < varr.length; i += 3) {
+                                    arr.push(varr[i])
+                                    var ts = firstts + i * 10 / 3
+                                    arr.push(ts)
+                                    tsResult.datapoints.push(arr)
+                                  }
+                                } else {
+                                  // handle error
+                                }
+                              });*/
+                            }
+                          }
+                        });
+                        tsResult.datapoints = tsResult.datapoints.sort(function (a, b) {
+                          // sort according to ts
+                          return a[1] - b[1];
+                        });
+                      } else {
+                        args[i].data.v.forEach(function (value) {
+                          // resource obj
+                          var arr = [];
+                          var val = 0;
+                          if (value.v != null) {
+                            val = value.v;
+                          } else if (value.sv != null) {
+                            val = value.sv;
+                          }
+                          arr.push(val);
+                          arr.push(value.UnixTimestamp);
+                          tsResult.datapoints.push(arr);
+                        });
+                      }
                     }
                   }
-                  tsResultArray.push(tsResult);
+                  if (tsResult.type == 'table') {
+                    tsResultArray.push(tsResult);
+                  } else {
+                    if (tsResult.datapoints.length > 0) {
+                      tsResultArray.push(tsResult);
+                    }
+                  }
                 }
                 var result = {};
                 result.data = tsResultArray;
@@ -431,7 +686,29 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                 console.log(error);
                 reject(error);
               });
-            });
+            };
+
+            /*return this.doRequest({
+              url: this.url + '/query',
+              data: query,
+              method: 'POST'
+            });*/
+            if (this.resourceList == null) {
+              return new Promise(function (resolve, reject) {
+                caller.getAllResourceUrlFromDevice(1).then(function (result) {
+                  caller.resourceList = result;
+                  console.log(caller.resourceList.length);
+                  return getQueryForAppIoT(resolve, reject);
+                }).catch(function (err) {
+                  console.log(err);
+                  reject(err);
+                });
+              });
+            } else {
+              return new Promise(function (resolve, reject) {
+                getQueryForAppIoT(resolve, reject);
+              });
+            }
           }
         }, {
           key: "testDatasource",
@@ -539,6 +816,9 @@ System.register(["lodash", "./node_modules/axios/dist/axios"], function (_export
                   if (resource.Name == 'BleSensor') {
                     list.push(resource.Name + ", 5min TimeWeightedAverage");
                     list.push(resource.Name + ", 5min Variance");
+                  }
+                  if (resource.Name == 'HealthSensor') {
+                    list.push(resource.Name + " Accuracy");
                   }
                 });
                 var result = {};

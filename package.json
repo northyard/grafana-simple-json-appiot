@@ -13,7 +13,7 @@
     "url": "git+https://github.com/northyard/grafana-simple-json-appiot.git"
   },
   "author": "",
-  "license": "ISC",  
+  "license": "ISC",
   "engines": {
     "node": "6.10.0"
   },
@@ -41,9 +41,14 @@
     "babel-plugin-transform-es2015-for-of": "^6.6.0",
     "babel-plugin-transform-es2015-modules-systemjs": "^6.24.1",
     "babel-preset-es2015": "^6.24.1",
+    "deflate-js": "^0.2.3",
+    "gzip-js": "^0.3.2",
     "lodash": "^4.17.4",
     "mocha": "^3.2.0",
-    "ngeohash": "^0.6.0"
+    "ngeohash": "^0.6.0",
+    "pako": "^1.0.6",
+    "wfdb": "0.0.9",
+    "zlib": "^1.0.5"
   },
   "homepage": "https://github.com/northyard/grafana-simple-json-appiot#readme"
 }
