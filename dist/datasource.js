@@ -665,9 +665,9 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                             val = value.sv;
                           } else {
                             if (value.bv) {
-                              val = value.bv;
+                              val = 1;
                             } else {
-                              val = value.bv;
+                              val = 0;
                             }
                           }
                           arr.push(val);

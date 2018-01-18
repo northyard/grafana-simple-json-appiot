@@ -627,10 +627,10 @@ export class GenericDatasource {
                     }
                     else {
                       if(value.bv) {
-                        val = value.bv  
+                        val = 1 
                       }
                       else {
-                        val = value.bv
+                        val = 0
                       }
                       
                     }
