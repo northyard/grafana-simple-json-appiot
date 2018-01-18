@@ -626,13 +626,7 @@ export class GenericDatasource {
                       val = value.sv
                     }
                     else {
-                      if(value.bv) {
-                        val = 1  
-                      }
-                      else {
-                        val = 0
-                      }
-                      
+                      val = value.bv
                     }
                     arr.push(val)
                     arr.push(value.UnixTimestamp)
