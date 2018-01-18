@@ -663,6 +663,8 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                             val = value.v;
                           } else if (value.sv != null) {
                             val = value.sv;
+                          } else {
+                            val = value.bv;
                           }
                           arr.push(val);
                           arr.push(value.UnixTimestamp);

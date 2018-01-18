@@ -625,6 +625,9 @@ export class GenericDatasource {
                     else if (value.sv != null) {
                       val = value.sv
                     }
+                    else {
+                      val = value.bv
+                    }
                     arr.push(val)
                     arr.push(value.UnixTimestamp)
                     tsResult.datapoints.push(arr)
