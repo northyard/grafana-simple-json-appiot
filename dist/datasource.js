@@ -664,7 +664,11 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                           } else if (value.sv != null) {
                             val = value.sv;
                           } else {
-                            val = value.bv;
+                            if (value.bv) {
+                              val = 1;
+                            } else {
+                              val = 0;
+                            }
                           }
                           arr.push(val);
                           arr.push(value.UnixTimestamp);
