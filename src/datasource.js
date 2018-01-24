@@ -564,11 +564,8 @@ export class GenericDatasource {
                     var arr = []
                     var val = 0
                     if (value.sv != null) {
-                      val = value.sv
-                      var blobresult = val.substring(0, 5)
-                      var check = blobresult.substring(0, 1)
-                      if (check == 'N' || check == 'O' || check == '~' || check == 'A') {
-                        var data = val.substring(5)
+                      val = value.sv                      
+                        var data = val
                         //const buffer = Buffer.from(data, 'base64');
                         const timestamp = value.UnixTimestamp
                         var unzipdata =''
@@ -591,24 +588,6 @@ export class GenericDatasource {
                         } catch (err){
                           console.log(err);  
                         }
-                        
-                        /*zlib.unzip(buffer, (err, buffer) => {
-                          if (!err) {
-                            console.log(buffer.toString());
-                            var varr = buffer.toString().split(',')
-                            var firstts = timestamp - varr.length * 10 / 3 // fs = 300                            
-                            for (var i = 0; i < varr.length; i += 3) {
-                              arr.push(varr[i])
-                              var ts = firstts + i * 10 / 3
-                              arr.push(ts)
-                              tsResult.datapoints.push(arr)
-                            }
-                          } else {
-                            // handle error
-                          }
-                        });*/
-  
-                      }
                     }
                   })
                   tsResult.datapoints = tsResult.datapoints.sort(function(a,b) { // sort according to ts
