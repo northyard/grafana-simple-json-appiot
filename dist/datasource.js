@@ -409,27 +409,34 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                   url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=" + from + "&measurementQuery.timespanEnd=" + to + "&measurementQuery.aggregationType=TimeWeightedAverage";
                 } else if (target.target.indexOf('Variance') >= 0) {
                   url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/aggregations?measurementQuery.resolution=300000&measurementQuery.timespanStart=" + from + "&measurementQuery.timespanEnd=" + to + "&measurementQuery.aggregationType=Variance";
-                } else if (target.target.indexOf('HealthSensor Accuracy') >= 0) {
-                  resource = caller.resourceList.find(function (resource) {
-                    return resource.Name == "acHealthSensor";
-                  });
-                  url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
-                  var _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorAcc', 'targettype': target.type }).catch(function (err) {
-                    console.log(err);
-                  });
-                  promiseArray.push(_promise);
-                  resource = caller.resourceList.find(function (resource) {
-                    return resource.Name == "HealthSensor";
-                  });
-                  url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
-                  _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorPre', 'targettype': target.type }).catch(function (err) {
-                    console.log(err);
-                  });
-                  promiseArray.push(_promise);
-                  return; //continue 
-                } else {
-                  url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
                 }
+                /*else if (target.target.indexOf('HealthSensor Accuracy') >= 0) {
+                  resource = caller.resourceList.find(resource => {
+                    return resource.Name == "acHealthSensor"
+                  })
+                  url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+                  let promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorAcc', 'targettype': target.type }).catch((err) => { console.log(err) })
+                  promiseArray.push(promise)  
+                  resource = caller.resourceList.find(resource => {
+                    return resource.Name == "HealthSensor"
+                  })
+                  url = `${caller.appiot.apiURI}/measurements/${resource.Id}/since/${from}/to/${to}`;
+                  promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'HealthSensorPre', 'targettype': target.type }).catch((err) => { console.log(err) })
+                  promiseArray.push(promise) 
+                  return //continue 
+                }*/
+                else {
+                    var currenttime = new Date().getTime();
+                    if (currenttime - to <= 60000) {
+                      // if time is within "latest", we may need to purposely inject latest measurement to the result
+                      url = caller.appiot.apiURI + "/resources/" + resource.Id;
+                      var _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'latestmeasurement', 'targettype': target.type }).catch(function (err) {
+                        console.log(err);
+                      });
+                      promiseArray.push(_promise);
+                    }
+                    url = caller.appiot.apiURI + "/measurements/" + resource.Id + "/since/" + from + "/to/" + to;
+                  }
                 var promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': target.target, 'targettype': target.type }).catch(function (err) {
                   console.log(err);
                 });
@@ -437,8 +444,10 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
               });
               var tsResultArray = [];
               // perform concurrent get calls for all smart objects                       
-              var healthSensorAcc = [];
-              var healthSensorPre = [];
+              //var healthSensorAcc = [];
+              //var healthSensorPre = [];
+              var latestMeasurementTime = null;
+              var latestMeasurementValue = null;
               axios.all(promiseArray).then(axios.spread(function () {
                 for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
                   args[_key2] = arguments[_key2];
@@ -558,47 +567,7 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                         tsResult.datapoints.push(arr);
                       });
                     } else {
-                      if (tsResult.target == 'HealthSensorAcc') {
-                        healthSensorAcc = args[i].data.v.slice();
-                        if (healthSensorAcc.length > 0 && healthSensorPre.length > 0) {
-                          var idx = 0;
-                          healthSensorPre.forEach(function (value) {
-                            if (value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp) {
-                              idx++;
-                            } else if (value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp) {
-                              var v = 0;
-                              if (value.v == healthSensorAcc[idx].v) {
-                                v = 1;
-                              }
-                              var arr = [];
-                              arr.push(v);
-                              arr.push(value.UnixTimestamp);
-                              tsResult.datapoints.push(arr);
-                              idx++;
-                            }
-                          });
-                        }
-                      } else if (tsResult.target == 'HealthSensorPre') {
-                        healthSensorPre = args[i].data.v.slice();
-                        if (healthSensorAcc.length > 0 && healthSensorPre.length > 0) {
-                          var idx = 0;
-                          healthSensorPre.forEach(function (value) {
-                            if (value.UnixTimestamp > healthSensorAcc[idx].UnixTimestamp) {
-                              idx++;
-                            } else if (value.UnixTimestamp == healthSensorAcc[idx].UnixTimestamp) {
-                              var v = 0;
-                              if (value.v == healthSensorAcc[idx].v) {
-                                v = 1;
-                              }
-                              var arr = [];
-                              arr.push(v);
-                              arr.push(value.UnixTimestamp);
-                              tsResult.datapoints.push(arr);
-                              idx++;
-                            }
-                          });
-                        }
-                      } else if (tsResult.target == 'blobData') {
+                      if (tsResult.target == 'ecgBlob') {
                         args[i].data.v.forEach(function (value) {
                           // resource obj
                           var arr = [];
@@ -633,7 +602,21 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                           // sort according to ts
                           return a[1] - b[1];
                         });
+                      } else if (tsResult.target == 'latestmeasurement') {
+                        latestMeasurementTime = args[i].data.LatestMeasurement.UnixTimestamp;
+                        if (args[i].data.LatestMeasurement.v != null) {
+                          latestMeasurementValue = args[i].data.LatestMeasurement.v;
+                        } else if (args[i].data.LatestMeasurement.sv != null) {
+                          latestMeasurementValue = args[i].data.LatestMeasurement.sv;
+                        } else {
+                          if (args[i].data.LatestMeasurement.bv) {
+                            latestMeasurementValue = 1;
+                          } else {
+                            latestMeasurementValue = 0;
+                          }
+                        }
                       } else {
+                        var voidLatestMeasurement = false;
                         args[i].data.v.forEach(function (value) {
                           // resource obj
                           var arr = [];
@@ -652,7 +635,18 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                           arr.push(val);
                           arr.push(value.UnixTimestamp);
                           tsResult.datapoints.push(arr);
+                          if (latestMeasurementTime != null) {
+                            if (value.UnixTimestamp == latestMeasurementTime) {
+                              voidLatestMeasurement = true;
+                            }
+                          }
                         });
+                        if (latestMeasurementTime != null && voidLatestMeasurement != true) {
+                          var arr = [];
+                          arr.push(latestMeasurementValue);
+                          arr.push(latestMeasurementTime);
+                          tsResult.datapoints.push(arr); // append latest measurement
+                        }
                       }
                     }
                   }
@@ -798,13 +792,13 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                 var list = [];
                 caller.resourceList.forEach(function (resource) {
                   list.push(resource.Name);
-                  if (resource.Name == 'BleSensor') {
+                  if (resource.Name == 'BleSensor' || resource.Name == 'Heart Rate') {
                     list.push(resource.Name + ", 5min TimeWeightedAverage");
                     list.push(resource.Name + ", 5min Variance");
                   }
-                  if (resource.Name == 'HealthSensor') {
-                    list.push(resource.Name + " Accuracy");
-                  }
+                  //if(resource.Name == 'HealthSensor'){
+                  //  list.push(resource.Name + " Accuracy")
+                  //}
                 });
                 var result = {};
                 result.data = list;
