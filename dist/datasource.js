@@ -427,10 +427,10 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                 }*/
                 else {
                     var currenttime = new Date().getTime();
-                    if (currenttime - to <= 60000) {
+                    if (currenttime - to > 0 && currenttime - to <= 60000) {
                       // if time is within "latest", we may need to purposely inject latest measurement to the result
                       url = caller.appiot.apiURI + "/resources/" + resource.Id;
-                      var _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': 'latestmeasurement', 'targettype': target.type }).catch(function (err) {
+                      var _promise = axios.get(url, { 'headers': caller.appiot.apiHeaders, 'target': target.target + '_latestmeasurement', 'targettype': target.type }).catch(function (err) {
                         console.log(err);
                       });
                       promiseArray.push(_promise);
@@ -446,8 +446,10 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
               // perform concurrent get calls for all smart objects                       
               //var healthSensorAcc = [];
               //var healthSensorPre = [];
-              var latestMeasurementTime = null;
-              var latestMeasurementValue = null;
+              var latestMeasurementTimeObj = {};
+              var latestMeasurementValueObj = {};
+              var from = new Date(req.range.from).getTime();
+              var to = new Date(req.range.to).getTime();
               axios.all(promiseArray).then(axios.spread(function () {
                 for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
                   args[_key2] = arguments[_key2];
@@ -602,18 +604,24 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                           // sort according to ts
                           return a[1] - b[1];
                         });
-                      } else if (tsResult.target == 'latestmeasurement') {
-                        latestMeasurementTime = args[i].data.LatestMeasurement.UnixTimestamp;
-                        if (args[i].data.LatestMeasurement.v != null) {
-                          latestMeasurementValue = args[i].data.LatestMeasurement.v;
-                        } else if (args[i].data.LatestMeasurement.sv != null) {
-                          latestMeasurementValue = args[i].data.LatestMeasurement.sv;
-                        } else {
-                          if (args[i].data.LatestMeasurement.bv) {
-                            latestMeasurementValue = 1;
+                      } else if (tsResult.target.indexOf('_latestmeasurement') > 0) {
+                        if (args[i].data.LatestMeasurement.UnixTimestamp < to && args[i].data.LatestMeasurement.UnixTimestamp > from) {
+                          var endind = tsResult.target.indexOf('_latestmeasurement');
+                          var targetname = tsResult.target.substring(0, endind);
+                          latestMeasurementTimeObj[targetname] = args[i].data.LatestMeasurement.UnixTimestamp;
+                          var val = 0;
+                          if (args[i].data.LatestMeasurement.v != null) {
+                            val = args[i].data.LatestMeasurement.v;
+                          } else if (args[i].data.LatestMeasurement.sv != null) {
+                            val = args[i].data.LatestMeasurement.sv;
                           } else {
-                            latestMeasurementValue = 0;
+                            if (args[i].data.LatestMeasurement.bv) {
+                              val = 1;
+                            } else {
+                              val = 0;
+                            }
                           }
+                          latestMeasurementValueObj[targetname] = val;
                         }
                       } else {
                         var voidLatestMeasurement = false;
@@ -635,16 +643,16 @@ System.register(["lodash", "./node_modules/axios/dist/axios", "./node_modules/pa
                           arr.push(val);
                           arr.push(value.UnixTimestamp);
                           tsResult.datapoints.push(arr);
-                          if (latestMeasurementTime != null) {
-                            if (value.UnixTimestamp == latestMeasurementTime) {
+                          if (latestMeasurementTimeObj[tsResult.target] != null) {
+                            if (value.UnixTimestamp == latestMeasurementTimeObj[tsResult.target]) {
                               voidLatestMeasurement = true;
                             }
                           }
                         });
-                        if (latestMeasurementTime != null && voidLatestMeasurement != true) {
+                        if (latestMeasurementTimeObj[tsResult.target] != null && voidLatestMeasurement != true) {
                           var arr = [];
-                          arr.push(latestMeasurementValue);
-                          arr.push(latestMeasurementTime);
+                          arr.push(latestMeasurementValueObj[tsResult.target]);
+                          arr.push(latestMeasurementTimeObj[tsResult.target]);
                           tsResult.datapoints.push(arr); // append latest measurement
                         }
                       }
